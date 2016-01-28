@@ -6,10 +6,13 @@ import akka.io.IO
 import spray.can.Http
 import akka.actor.ActorContext
 import akka.actor.Actor
+import spray.http.HttpRequest
+import spray.http.HttpResponse
 import spray.http.HttpResponse
 import spray.routing.directives.LogEntry
 import spray.http.HttpRequest
 import akka.event.Logging.InfoLevel
+import spray.routing.directives.LogEntry
 
 object StartHub extends App with ActorHelper {
 
@@ -22,11 +25,17 @@ object StartHub extends App with ActorHelper {
 
 class HubServices extends Actor with HubRoutes {
   def actorRefFactory: ActorContext = context
+
   // logs just the request method and response status at info level
-  def requestMethodAndResponseStatusAsInfo(req: HttpRequest): Any => Option[LogEntry] = {
-    case res: HttpResponse => Some(LogEntry(req.method + ":" + req.uri + ":" + res.message.status, InfoLevel))
+  def requestMethodAndResponseStatusAsInfo(req: HttpRequest)(implicit requestTimestamp: Long = System.currentTimeMillis()): Any => Option[LogEntry] = {
+    case res: HttpResponse => {
+      val responseTimestamp: Long = System.currentTimeMillis()
+      val elapsedTime: Long = responseTimestamp - requestTimestamp
+      Some(LogEntry(req.method + ":" + req.uri + ":" + res.message.status + ":" + elapsedTime, akka.event.Logging.InfoLevel))
+    }
     case _ => None // other kind of responses
   }
+
 
   def routeWithLogging = logRequestResponse(requestMethodAndResponseStatusAsInfo _)(hubRoutes)
 
